@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -39,7 +40,9 @@ public class ChatServer {
                 Socket clientSocket = server.accept();
                 var in = new BufferedReader(
                         new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-                Client client = new Client(in, clientSocket, clients.size() + 1);
+                var out = new PrintWriter(new OutputStreamWriter(
+                        clientSocket.getOutputStream(), StandardCharsets.UTF_8), true);
+                Client client = new Client(in, out, clientSocket, clients.size() + 1);
                 clients.add(client);
                 Thread.ofVirtual().start(() -> handleConnection(client));
             }
@@ -50,7 +53,8 @@ public class ChatServer {
         try (client) {
             String line;
             while ((line = client.getIn().readLine()) != null) { // null = client disconnected
-                System.out.println("client " + client.getId() + ": " + line);
+                final String message = line;
+                this.clients.forEach(c -> c.getOut().println(message));
             }
         } catch (IOException e) {
             System.out.println("Client could not be initiated properly");
