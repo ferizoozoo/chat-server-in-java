@@ -8,12 +8,12 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Hello world!
- */
 public class ChatServer {
     private int port;
+    private Set<Client> clients = ConcurrentHashMap.newKeySet();
     // private String host;
 
     public int getPort() {
@@ -36,25 +36,24 @@ public class ChatServer {
         try (ServerSocket server = new ServerSocket(this.port)) {
             System.out.println("Server is running on " + this.port);
             while (true) {
-                Socket client = server.accept();
+                Socket clientSocket = server.accept();
+                var in = new BufferedReader(
+                        new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+                Client client = new Client(in, clientSocket, clients.size() + 1);
+                clients.add(client);
                 Thread.ofVirtual().start(() -> handleConnection(client));
             }
         }
     }
 
-    private void handleConnection(Socket client) {
-        try (client;
-                var in = new BufferedReader(new InputStreamReader(
-                        client.getInputStream(), StandardCharsets.UTF_8));
-                var out = new PrintWriter(new OutputStreamWriter(
-                        client.getOutputStream(), StandardCharsets.UTF_8), true)) {
-
+    private void handleConnection(Client client) {
+        try (client) {
             String line;
-            while ((line = in.readLine()) != null) { // null = client disconnected
-                out.println("echo: " + line);
+            while ((line = client.getIn().readLine()) != null) { // null = client disconnected
+                System.out.println("client " + client.getId() + ": " + line);
             }
         } catch (IOException e) {
-            System.err.println("Client error: " + e.getMessage());
+            System.out.println("Client could not be initiated properly");
         }
     }
 }
