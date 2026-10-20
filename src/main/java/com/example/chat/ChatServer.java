@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatServer {
     private int port;
-    private Set<Client> clients = ConcurrentHashMap.newKeySet();
+    private ConcurrentHashMap<String, Set<Client>> rooms = new ConcurrentHashMap<>();
 
     public int getPort() {
         return this.port;
@@ -32,8 +32,8 @@ public class ChatServer {
                         new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
                 var out = new PrintWriter(new OutputStreamWriter(
                         clientSocket.getOutputStream(), StandardCharsets.UTF_8), true);
-                Client client = new Client(in, out, clientSocket, clients.size() + 1);
-                clients.add(client);
+                final int clientCount = this.rooms.values().stream().mapToInt(Set::size).sum();
+                Client client = new Client(in, out, clientSocket, clientCount + 1);
                 Thread.ofVirtual().start(() -> handleConnection(client));
             }
         }
@@ -43,14 +43,19 @@ public class ChatServer {
         try (client) {
             String line;
             String nickname = "client-" + client.getId();
+            String roomname = "";
             while ((line = client.getIn().readLine()) != null) { // null = client disconnected
                 var command = CommandParser.parse(line);
                 if (command.command() == Commands.NICK) {
                     nickname = command.value();
                     continue;
+                } else if (command.command() == Commands.JOIN) {
+                    roomname = command.value();
+                    rooms.computeIfAbsent(roomname, k -> ConcurrentHashMap.newKeySet()).add(client);
+                    continue;
                 }
-                final String message = "[" + nickname + "] " + line;
-                this.clients.forEach(c -> c.getOut().println(message));
+                final String message = "[" + nickname + "-" + roomname + "] " + line;
+                this.rooms.get(roomname).forEach(k -> k.getOut().println(message));
             }
         } catch (IOException e) {
             System.out.println("Client could not be initiated properly");
