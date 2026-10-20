@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ChatServer {
     private int port;
     private Set<Client> clients = ConcurrentHashMap.newKeySet();
-    // private String host;
 
     public int getPort() {
         return this.port;
@@ -24,14 +22,6 @@ public class ChatServer {
     public void setPort(int port) {
         this.port = port;
     }
-
-    // public String getHost() {
-    // return this.host;
-    // }
-
-    // public void setHost(String host) {
-    // this.host = host;
-    // }
 
     public void run() throws IOException {
         try (ServerSocket server = new ServerSocket(this.port)) {
@@ -52,8 +42,14 @@ public class ChatServer {
     private void handleConnection(Client client) {
         try (client) {
             String line;
+            String nickname = "client-" + client.getId();
             while ((line = client.getIn().readLine()) != null) { // null = client disconnected
-                final String message = line;
+                var command = CommandParser.parse(line);
+                if (command.command() == Commands.NICK) {
+                    nickname = command.value();
+                    continue;
+                }
+                final String message = "[" + nickname + "] " + line;
                 this.clients.forEach(c -> c.getOut().println(message));
             }
         } catch (IOException e) {
