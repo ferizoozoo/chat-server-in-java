@@ -33,17 +33,18 @@ public class ChatServer {
                 var out = new PrintWriter(new OutputStreamWriter(
                         clientSocket.getOutputStream(), StandardCharsets.UTF_8), true);
                 final int clientCount = this.rooms.values().stream().mapToInt(Set::size).sum();
-                Client client = new Client(in, out, clientSocket, clientCount + 1);
+                Client client = new Client(in, out, clientCount + 1);
                 Thread.ofVirtual().start(() -> handleConnection(client));
             }
         }
     }
 
     private void handleConnection(Client client) {
+        Thread writer = Thread.ofVirtual().start(() -> client.writeLoop());
+        String roomname = "";
         try (client) {
             String line;
             String nickname = "client-" + client.getId();
-            String roomname = "";
             while ((line = client.getIn().readLine()) != null) { // null = client disconnected
                 var command = CommandParser.parse(line);
                 if (command.command() == Commands.NICK) {
@@ -54,11 +55,17 @@ public class ChatServer {
                     rooms.computeIfAbsent(roomname, k -> ConcurrentHashMap.newKeySet()).add(client);
                     continue;
                 }
-                final String message = "[" + nickname + "-" + roomname + "] " + line;
-                this.rooms.get(roomname).forEach(k -> k.getOut().println(message));
+                final String message = "[" + nickname + "-" + roomname + "] " + line + "\n";
+                this.rooms.get(roomname).forEach(k -> k.addToQueue(message));
             }
         } catch (IOException e) {
             System.out.println("Client could not be initiated properly");
+        } finally {
+            writer.interrupt();
+            var room = this.rooms.get(roomname);
+            if (room != null) {
+                room.remove(client);
+            }
         }
     }
 }
