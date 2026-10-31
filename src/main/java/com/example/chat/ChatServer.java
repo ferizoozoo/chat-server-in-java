@@ -74,10 +74,10 @@ public class ChatServer {
                 } else if (command.command() == Commands.PONG) {
                     continue;
                 } else if (command.command() == Commands.PING) {
-                    client.addToQueue("/pong\n");
+                    client.addToQueue(Message.format("/pong"));
                     continue;
                 }
-                final String message = "[" + nickname + "-" + roomname + "] " + line + "\n";
+                final Message message = Message.format(nickname, roomname, line);
                 this.rooms.get(roomname).forEach(k -> k.addToQueue(message));
             }
         } catch (IOException e) {
@@ -102,7 +102,7 @@ public class ChatServer {
                     client.disconnect();
                     return;
                 }
-                client.addToQueue("/ping\n");
+                client.addToQueue(Message.format("/ping"));
             }
         } catch (InterruptedException e) {
             client.disconnect();

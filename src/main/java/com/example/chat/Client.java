@@ -12,7 +12,7 @@ public final class Client implements AutoCloseable {
     private final int QUEUE_CAPACITY = 100;
 
     private final Socket socket;
-    private BlockingQueue<String> queue;
+    private BlockingQueue<Message> queue;
     private BufferedReader in;
     private PrintWriter out;
     private int id;
@@ -39,7 +39,7 @@ public final class Client implements AutoCloseable {
         return this.out;
     }
 
-    protected synchronized void addToQueue(String message) {
+    protected synchronized void addToQueue(Message message) {
         this.queue.offer(message);
     }
 
@@ -81,7 +81,7 @@ public final class Client implements AutoCloseable {
 
             try {
                 var message = this.queue.take();
-                this.out.write(message);
+                this.out.write(message.format());
             } catch (Exception e) {
                 System.err.println(e);
             }
