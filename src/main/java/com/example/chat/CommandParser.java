@@ -18,6 +18,12 @@ public class CommandParser {
                 case "quit" -> {
                     return new CommandValue(Commands.QUIT, arg);
                 }
+                case "ping" -> {
+                    return new CommandValue(Commands.PING, arg);
+                }
+                case "pong" -> {
+                    return new CommandValue(Commands.PONG, arg);
+                }
             }
         }
 

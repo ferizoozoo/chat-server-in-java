@@ -3,25 +3,28 @@ package com.example.chat;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-// import java.net.Socket;
+import java.net.Socket;
+import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public final class Client implements AutoCloseable {
     private final int QUEUE_CAPACITY = 100;
 
-    // private Socket socket;
+    private final Socket socket;
     private BlockingQueue<String> queue;
     private BufferedReader in;
     private PrintWriter out;
     private int id;
+    private volatile Instant lastReply;
 
-    protected Client(BufferedReader in, PrintWriter out, /* Socket socket, */ int id) {
-        // this.socket = socket;
+    protected Client(Socket socket, BufferedReader in, PrintWriter out, int id) {
+        this.socket = socket;
         this.queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         this.in = in;
         this.out = out;
         this.id = id;
+        this.lastReply = Instant.now();
     }
 
     protected int getId() {
@@ -38,6 +41,25 @@ public final class Client implements AutoCloseable {
 
     protected synchronized void addToQueue(String message) {
         this.queue.offer(message);
+    }
+
+    protected void setLastReply() {
+        this.lastReply = Instant.now();
+    }
+
+    public Instant getLastReply() {
+        return this.lastReply;
+    }
+
+    protected boolean isClosed() {
+        return this.socket.isClosed();
+    }
+
+    protected void disconnect() {
+        try {
+            this.socket.close();
+        } catch (IOException e) {
+        }
     }
 
     protected void writeLoop() {
@@ -72,9 +94,7 @@ public final class Client implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
-        // this.socket.close();
-        this.in.close();
-        this.out.close();
         this.queue.clear();
+        this.socket.close();
     }
 }
