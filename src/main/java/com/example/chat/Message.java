@@ -27,6 +27,6 @@ public record Message(String sender, String room, String text, Instant createdAt
         if (isSystem()) {
             return this.text + "\n";
         }
-        return "[" + this.sender + "-" + this.room + "] " + this.text + "\n";
+        return "[" + this.sender + "-" + this.room + " " + this.createdAt + "] " + this.text + "\n";
     }
 }
