@@ -1,17 +1,13 @@
 package com.example.chat;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ChatServer {
     static final int IDLE_TIMEOUT_MS = 30_000;
@@ -21,6 +17,7 @@ public class ChatServer {
     private int idleTimeoutMs = IDLE_TIMEOUT_MS;
     private int heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS;
     private ConcurrentHashMap<String, Set<Client>> rooms = new ConcurrentHashMap<>();
+    private final AtomicInteger nextClientId = new AtomicInteger(1);
 
     public int getPort() {
         return this.port;
@@ -43,12 +40,14 @@ public class ChatServer {
             System.out.println("Server is running on " + this.port);
             while (true) {
                 Socket clientSocket = server.accept();
-                var in = new BufferedReader(
-                        new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-                var out = new PrintWriter(new OutputStreamWriter(
-                        clientSocket.getOutputStream(), StandardCharsets.UTF_8), true);
-                final int clientCount = this.rooms.values().stream().mapToInt(Set::size).sum();
-                Client client = new Client(clientSocket, in, out, clientCount + 1);
+                Client client;
+                try {
+                    client = new Client(clientSocket, nextClientId.getAndIncrement());
+                } catch (IOException e) {
+                    System.out.println("Could not set up client: " + e.getMessage());
+                    clientSocket.close();
+                    continue;
+                }
                 Thread.ofVirtual().start(() -> handleConnection(client));
                 Thread.ofVirtual().start(() -> heartbeat(client));
             }
@@ -61,7 +60,7 @@ public class ChatServer {
         try (client) {
             String line;
             String nickname = "client-" + client.getId();
-            while ((line = client.getIn().readLine()) != null) { // null = client disconnected
+            while ((line = client.readLine()) != null) { // null = client disconnected
                 client.setLastReply();
                 var command = CommandParser.parse(line);
                 if (command.command() == Commands.NICK) {
@@ -75,6 +74,12 @@ public class ChatServer {
                     continue;
                 } else if (command.command() == Commands.PING) {
                     client.addToQueue(Message.format("/pong"));
+                    continue;
+                } else if (command.command() == Commands.QUIT) {
+                    break;
+                }
+                if (roomname.isEmpty()) {
+                    client.addToQueue(Message.format("You are not in a room. Use /join <room> first."));
                     continue;
                 }
                 final Message message = Message.format(nickname, roomname, line);

@@ -2,8 +2,11 @@ package com.example.chat;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -13,16 +16,16 @@ public final class Client implements AutoCloseable {
 
     private final Socket socket;
     private BlockingQueue<Message> queue;
-    private BufferedReader in;
-    private PrintWriter out;
+    private final BufferedReader in;
+    private final PrintWriter out;
     private int id;
     private volatile Instant lastReply;
 
-    protected Client(Socket socket, BufferedReader in, PrintWriter out, int id) {
+    protected Client(Socket socket, int id) throws IOException {
         this.socket = socket;
         this.queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
-        this.in = in;
-        this.out = out;
+        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+        this.out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
         this.id = id;
         this.lastReply = Instant.now();
     }
@@ -31,12 +34,8 @@ public final class Client implements AutoCloseable {
         return this.id;
     }
 
-    protected BufferedReader getIn() {
-        return this.in;
-    }
-
-    protected PrintWriter getOut() {
-        return this.out;
+    protected String readLine() throws IOException {
+        return this.in.readLine();
     }
 
     protected synchronized void addToQueue(Message message) {
@@ -62,6 +61,7 @@ public final class Client implements AutoCloseable {
         }
     }
 
+    // runtime of the whole process of adding chat messages
     protected void writeLoop() {
         try {
             while (!Thread.currentThread().isInterrupted()) {
