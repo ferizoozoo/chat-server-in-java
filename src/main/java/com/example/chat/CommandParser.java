@@ -24,6 +24,12 @@ public class CommandParser {
                 case "pong" -> {
                     return new CommandValue(Commands.PONG, arg);
                 }
+                case "who" -> {
+                    return new CommandValue(Commands.WHO, arg);
+                }
+                case "rooms" -> {
+                    return new CommandValue(Commands.ROOMS, arg);
+                }
             }
         }
 

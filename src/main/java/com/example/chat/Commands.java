@@ -6,6 +6,8 @@ public enum Commands {
     QUIT,
     PING,
     PONG,
+    WHO,
+    ROOMS,
     ERROR,
     NOOP
 }

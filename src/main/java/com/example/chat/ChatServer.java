@@ -56,42 +56,54 @@ public class ChatServer {
 
     private void handleConnection(Client client) {
         Thread writer = Thread.ofVirtual().start(() -> client.writeLoop());
-        String roomname = "";
         try (client) {
-            String line;
-            String nickname = "client-" + client.getId();
-            while ((line = client.readLine()) != null) { // null = client disconnected
-                client.setLastReply();
-                var command = CommandParser.parse(line);
-                if (command.command() == Commands.NICK) {
-                    nickname = command.value();
-                    continue;
-                } else if (command.command() == Commands.JOIN) {
-                    roomname = command.value();
-                    rooms.computeIfAbsent(roomname, k -> ConcurrentHashMap.newKeySet()).add(client);
-                    continue;
-                } else if (command.command() == Commands.PONG) {
-                    continue;
-                } else if (command.command() == Commands.PING) {
-                    client.addToQueue(Message.format("/pong"));
-                    continue;
-                } else if (command.command() == Commands.QUIT) {
-                    break;
-                }
-                if (roomname.isEmpty()) {
-                    client.addToQueue(Message.format("You are not in a room. Use /join <room> first."));
-                    continue;
-                }
-                final Message message = Message.format(nickname, roomname, line);
-                this.rooms.get(roomname).forEach(k -> k.addToQueue(message));
-            }
+            readLoop(client);
         } catch (IOException e) {
             System.out.println("Client " + client.getId() + " disconnected: " + e.getMessage());
         } finally {
             writer.interrupt();
-            var room = this.rooms.get(roomname);
-            if (room != null) {
-                room.remove(client);
+            this.rooms.values().forEach(room -> room.remove(client));
+        }
+    }
+
+    private void readLoop(Client client) throws IOException {
+        String line;
+        String nickname = "client-" + client.getId();
+        String roomname = "";
+        while ((line = client.readLine()) != null) { // null = client disconnected
+            client.setLastReply();
+            var command = CommandParser.parse(line);
+            switch (command.command()) {
+                case Commands.NICK -> {
+                    nickname = command.value();
+                }
+                case Commands.JOIN -> {
+                    roomname = command.value();
+                    rooms.computeIfAbsent(roomname, k -> ConcurrentHashMap.newKeySet()).add(client);
+                }
+                case Commands.PING -> {
+                    client.addToQueue(Message.format("/pong"));
+                }
+                case Commands.PONG -> {
+                }
+                case Commands.QUIT -> {
+                    return;
+                }
+                case Commands.WHO -> {
+                    client.addToQueue(Message.format(roomname));
+                }
+                case Commands.ROOMS -> {
+                    String names = this.rooms.reduceKeys(Long.MAX_VALUE, (a, b) -> a + ", " + b);
+                    client.addToQueue(Message.format(names == null ? "No rooms yet." : names));
+                }
+                default -> {
+                    if (roomname.isEmpty()) {
+                        client.addToQueue(Message.format("You are not in a room. Use /join <room> first."));
+                    } else {
+                        final Message message = Message.format(nickname, roomname, line);
+                        this.rooms.get(roomname).forEach(k -> k.addToQueue(message));
+                    }
+                }
             }
         }
     }
