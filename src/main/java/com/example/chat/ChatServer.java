@@ -17,6 +17,7 @@ public class ChatServer {
     private int idleTimeoutMs = IDLE_TIMEOUT_MS;
     private int heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS;
     private ConcurrentHashMap<String, Set<Client>> rooms = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, Client> users = new ConcurrentHashMap<>();
     private final AtomicInteger nextClientId = new AtomicInteger(1);
 
     public int getPort() {
@@ -63,6 +64,7 @@ public class ChatServer {
         } finally {
             writer.interrupt();
             this.rooms.values().forEach(room -> room.remove(client));
+            this.users.values().removeIf(user -> user == client);
         }
     }
 
@@ -70,15 +72,25 @@ public class ChatServer {
         String line;
         String nickname = "client-" + client.getId();
         String roomname = "";
+        this.users.put(nickname, client);
         while ((line = client.readLine()) != null) { // null = client disconnected
             client.setLastReply();
             var command = CommandParser.parse(line);
             switch (command.command()) {
                 case Commands.NICK -> {
-                    nickname = command.value();
+                    String newName = command.arg();
+                    if (newName.isEmpty()) {
+                        client.addToQueue(Message.format("Usage: /nick <name>"));
+                    } else if (newName.equals(nickname)) {
+                    } else if (this.users.putIfAbsent(newName, client) != null) {
+                        client.addToQueue(Message.format("Nickname '" + newName + "' is already taken."));
+                    } else {
+                        this.users.remove(nickname, client);
+                        nickname = newName;
+                    }
                 }
                 case Commands.JOIN -> {
-                    roomname = command.value();
+                    roomname = command.arg();
                     rooms.computeIfAbsent(roomname, k -> ConcurrentHashMap.newKeySet()).add(client);
                 }
                 case Commands.PING -> {
@@ -91,6 +103,25 @@ public class ChatServer {
                 }
                 case Commands.WHO -> {
                     client.addToQueue(Message.format(roomname));
+                }
+                case Commands.MSG -> {
+                    String target = command.arg();
+                    String text = command.subArg();
+                    var user = this.users.get(target);
+                    if (target.isEmpty() || text.isEmpty()) {
+                        client.addToQueue(Message.format("Usage: /msg <nick> <text>"));
+                    } else if (user == null) {
+                        client.addToQueue(Message.format("No user named '" + target + "'."));
+                    } else {
+                        final Message message = Message.format(nickname, "dm", text);
+                        user.addToQueue(message);
+                        if (user != client) {
+                            client.addToQueue(message);
+                        }
+                    }
+                }
+                case Commands.ERROR -> {
+                    client.addToQueue(Message.format(command.arg()));
                 }
                 case Commands.ROOMS -> {
                     String names = this.rooms.reduceKeys(Long.MAX_VALUE, (a, b) -> a + ", " + b);
