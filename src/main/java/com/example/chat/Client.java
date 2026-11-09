@@ -20,6 +20,8 @@ public final class Client implements AutoCloseable {
     private final PrintWriter out;
     private int id;
     private volatile Instant lastReply;
+    private String nickname;
+    private Room room;
 
     protected Client(Socket socket, int id) throws IOException {
         this.socket = socket;
@@ -28,10 +30,27 @@ public final class Client implements AutoCloseable {
         this.out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
         this.id = id;
         this.lastReply = Instant.now();
+        this.nickname = "client-" + id;
     }
 
     protected int getId() {
         return this.id;
+    }
+
+    protected String getNickname() {
+        return this.nickname;
+    }
+
+    protected void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    protected Room getRoom() {
+        return this.room;
+    }
+
+    protected void setRoom(Room room) {
+        this.room = room;
     }
 
     protected String readLine() throws IOException {
@@ -40,6 +59,10 @@ public final class Client implements AutoCloseable {
 
     protected synchronized void addToQueue(Message message) {
         this.queue.offer(message);
+    }
+
+    protected void send(String text) {
+        addToQueue(Message.format(text));
     }
 
     protected void setLastReply() {
