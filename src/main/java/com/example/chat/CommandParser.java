@@ -37,6 +37,9 @@ public class CommandParser {
                 case "rooms" -> {
                     return new CommandValue(Commands.ROOMS, null, arg, "");
                 }
+                case "kick" -> {
+                    return new CommandValue(Commands.KICK, null, arg, "");
+                }
                 case "msg" -> {
                     return new CommandValue(Commands.MSG, Commands.NICK, arg, subArg);
                 }

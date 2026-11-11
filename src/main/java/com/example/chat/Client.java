@@ -22,6 +22,7 @@ public final class Client implements AutoCloseable {
     private volatile Instant lastReply;
     private String nickname;
     private Room room;
+    private boolean cannotKick;
 
     protected Client(Socket socket, int id) throws IOException {
         this.socket = socket;
@@ -51,6 +52,14 @@ public final class Client implements AutoCloseable {
 
     protected void setRoom(Room room) {
         this.room = room;
+    }
+
+    protected void setModerator() {
+        this.cannotKick = true;
+    }
+
+    protected boolean cannotKick() {
+        return this.cannotKick;
     }
 
     protected String readLine() throws IOException {

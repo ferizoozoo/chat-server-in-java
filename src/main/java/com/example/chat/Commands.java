@@ -10,5 +10,6 @@ public enum Commands {
     ROOMS,
     ERROR,
     MSG,
+    KICK,
     NOOP
 }

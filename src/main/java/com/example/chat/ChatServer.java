@@ -85,6 +85,7 @@ public class ChatServer {
                 case PING -> client.send("/pong");
                 case PONG -> {
                 }
+                case KICK -> kickUserFromRoom(client, command.arg());
                 case ERROR -> client.send(command.arg());
                 case QUIT -> {
                     return;
@@ -141,6 +142,36 @@ public class ChatServer {
             return;
         }
         room.broadcast(Message.format(client.getNickname(), room.getName(), text));
+    }
+
+    private void kickUserFromRoom(Client client, String targetName) {
+        if (client.cannotKick()) {
+            client.send("You are not allowed to kick users.");
+            return;
+        }
+        if (targetName.isEmpty()) {
+            client.send("Usage: /kick <nick>");
+            return;
+        }
+        var room = client.getRoom();
+        if (room == null) {
+            client.send("You are not in a room.");
+            return;
+        }
+        var user = this.users.get(targetName);
+        if (user == null || user.getRoom() != room) {
+            client.send("No user named '" + targetName + "' in " + room.getName() + ".");
+            return;
+        }
+        if (user == client) {
+            client.send("You can't kick yourself.");
+            return;
+        }
+
+        room.leave(user);
+        user.setRoom(null);
+        user.send("You were kicked from " + room.getName() + " by " + client.getNickname() + ".");
+        room.broadcast(Message.format(targetName + " was kicked by " + client.getNickname() + "."));
     }
 
     private void heartbeat(Client client) {
