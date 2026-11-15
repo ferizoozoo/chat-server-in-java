@@ -1,11 +1,13 @@
 package com.example.chat;
 
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
 
 public class ChatServer {
     static final int IDLE_TIMEOUT_MS = 30_000;
@@ -37,7 +39,8 @@ public class ChatServer {
 
     public void run() throws IOException {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> gracefulShutdown()));
-        try (var server = new ServerSocket(this.port)) {
+
+        try (var server = (SSLServerSocket) SSLServerSocketFactory.getDefault().createServerSocket(this.port)) {
             System.out.println("Server is running on " + this.port);
             while (true) {
                 var socket = server.accept();
