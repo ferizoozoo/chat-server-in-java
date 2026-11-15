@@ -36,6 +36,7 @@ public class ChatServer {
     }
 
     public void run() throws IOException {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> gracefulShutdown()));
         try (var server = new ServerSocket(this.port)) {
             System.out.println("Server is running on " + this.port);
             while (true) {
@@ -63,7 +64,8 @@ public class ChatServer {
         } finally {
             writer.interrupt();
             this.rooms.values().forEach(room -> room.leave(client));
-            this.users.values().removeIf(user -> user == client);        }
+            this.users.values().removeIf(user -> user == client);
+        }
     }
 
     private void readLoop(Client client) throws IOException {
@@ -73,7 +75,8 @@ public class ChatServer {
         while ((line = client.readLine()) != null) { // null = client disconnected
             client.setLastReply();
             var command = CommandParser.parse(line);
-            // Heartbeat replies and /quit are never limited. Key by id so /nick can't reset the limit.
+            // Heartbeat replies and /quit are never limited. Key by id so /nick can't reset
+            // the limit.
             boolean limited = command.command() != Commands.PONG && command.command() != Commands.QUIT;
             if (limited && !this.rateLimiter.receive(String.valueOf(client.getId()))) {
                 client.send("You are sending messages too fast. Slow down.");
@@ -99,6 +102,21 @@ public class ChatServer {
                 default -> sendToRoom(client, line);
             }
         }
+    }
+
+    private void gracefulShutdown() {
+        this.rooms.clear();
+        this.users.values().forEach((user) -> {
+            try {
+                user.send("Server is shutting down.");
+                user.sendPending();
+                user.close();
+
+            } catch (Exception e) {
+
+            }
+        });
+        this.users.clear();
     }
 
     private void changeNickname(Client client, String newName) {

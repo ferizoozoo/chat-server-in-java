@@ -23,6 +23,7 @@ public final class Client implements AutoCloseable {
     private String nickname;
     private Room room;
     private boolean cannotKick;
+    private final Object writeLock = new Object();
 
     protected Client(Socket socket, int id) throws IOException {
         this.socket = socket;
@@ -106,22 +107,21 @@ public final class Client implements AutoCloseable {
     }
 
     private void write() {
-        while (true) {
-            if (this.queue.isEmpty()) {
-                break;
-            }
-
-            try {
-                var message = this.queue.take();
+        synchronized (this.writeLock) {
+            Message message;
+            while ((message = this.queue.poll()) != null) {
                 this.out.write(message.format());
-            } catch (Exception e) {
-                System.err.println(e);
             }
         }
     }
 
     protected void flush() {
         this.out.flush();
+    }
+
+    protected void sendPending() {
+        this.write();
+        this.flush();
     }
 
     @Override
