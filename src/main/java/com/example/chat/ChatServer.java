@@ -17,6 +17,7 @@ public class ChatServer {
     private final ConcurrentHashMap<String, Room> rooms = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Client> users = new ConcurrentHashMap<>();
     private final AtomicInteger nextClientId = new AtomicInteger(1);
+    private final RateLimiter rateLimiter = RateLimiter.create(10);
 
     public int getPort() {
         return this.port;
@@ -62,8 +63,7 @@ public class ChatServer {
         } finally {
             writer.interrupt();
             this.rooms.values().forEach(room -> room.leave(client));
-            this.users.values().removeIf(user -> user == client);
-        }
+            this.users.values().removeIf(user -> user == client);        }
     }
 
     private void readLoop(Client client) throws IOException {
@@ -73,6 +73,12 @@ public class ChatServer {
         while ((line = client.readLine()) != null) { // null = client disconnected
             client.setLastReply();
             var command = CommandParser.parse(line);
+            // Heartbeat replies and /quit are never limited. Key by id so /nick can't reset the limit.
+            boolean limited = command.command() != Commands.PONG && command.command() != Commands.QUIT;
+            if (limited && !this.rateLimiter.receive(String.valueOf(client.getId()))) {
+                client.send("You are sending messages too fast. Slow down.");
+                continue;
+            }
             switch (command.command()) {
                 case NICK -> changeNickname(client, command.arg());
                 case JOIN -> joinRoom(client, command.arg());
